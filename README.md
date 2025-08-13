@@ -1,1 +1,1 @@
-# FrittenK-se-esp-script-lua
+## This script is meant for educational purposes only.

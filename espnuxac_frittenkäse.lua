@@ -1,9 +1,11 @@
--- nucax loves frittenfett ihhh wtf was ist dad häää ich bin so brpke ich gucke gleoch aber mal nacj nh lua editor :)
+-- nucax loves frittenfett ihhh wtf
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Frittenkäse"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -15,6 +17,43 @@ Frame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
 
+-- Make GUI draggable on mobile and desktop
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+	                           startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+Frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+-- Layout
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Parent = Frame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -30,6 +69,7 @@ Minimized.TextSize = 18
 Minimized.Visible = false
 Minimized.Parent = ScreenGui
 
+-- Toggles & Dropdowns
 local function makeToggle(name, default)
 	local toggle = Instance.new("TextButton")
 	toggle.Size = UDim2.new(1, 0, 0, 25)
@@ -73,6 +113,7 @@ local tracerPos = makeDropdown("Tracer Pos", {"Top", "Middle", "Bottom"}, 2)
 
 local highlights, billboardGuis, drawings = {}, {}, {}
 
+-- Highlight Functions
 local function addHighlight(player)
 	if highlights[player] then return end
 	local highlight = Instance.new("Highlight")
@@ -90,6 +131,7 @@ local function removeHighlight(player)
 	end
 end
 
+-- Billboard Functions
 local function createBillboard(player)
 	if billboardGuis[player] then return end
 	local bb = Instance.new("BillboardGui")
@@ -141,8 +183,9 @@ local function removeBillboard(player)
 	end
 end
 
+-- Main ESP Loop
 RunService.RenderStepped:Connect(function()
-	for _, v in pairs(drawings) do v:Remove() end
+	for _, v in pairs(drawings) do v:Destroy() end
 	drawings = {}
 
 	for _, player in pairs(Players:GetPlayers()) do
@@ -187,15 +230,17 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- Clear all ESP
 local function clearAllESP()
 	for _, plr in pairs(Players:GetPlayers()) do
 		removeHighlight(plr)
 		removeBillboard(plr)
 	end
-	for _, v in pairs(drawings) do v:Remove() end
+	for _, v in pairs(drawings) do v:Destroy() end
 	drawings = {}
 end
 
+-- Buttons
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(1, 0, 0, 25)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -227,6 +272,7 @@ Minimized.MouseButton1Click:Connect(function()
 	Minimized.Visible = false
 end)
 
+-- Rainbow Footer
 local Footer = Instance.new("TextLabel")
 Footer.Size = UDim2.new(1, 0, 0, 35)
 Footer.BackgroundTransparency = 1
@@ -245,6 +291,7 @@ task.spawn(function()
 	end
 end)
 
+-- Player cleanup
 Players.PlayerRemoving:Connect(function(p)
 	removeHighlight(p)
 	removeBillboard(p)

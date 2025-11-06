@@ -17,23 +17,28 @@ Frame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 Frame.BorderSizePixel = 0
 Frame.Parent = ScreenGui
 
--- Make GUI draggable on mobile and desktop
-local dragging = false
-local dragInput, dragStart, startPos
-
+-- Dragging GUI
+local dragging, dragInput, dragStart, startPos
 local function update(input)
 	local delta = input.Position - dragStart
 	Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 	                           startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-Frame.InputBegan:Connect(function(input)
+-- Connections tracker for cleanup
+local connections = {}
+local function connect(signal, func)
+	local conn = signal:Connect(func)
+	table.insert(connections, conn)
+	return conn
+end
+
+connect(Frame.InputBegan, function(input)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = true
 		dragStart = input.Position
 		startPos = Frame.Position
-
-		input.Changed:Connect(function()
+		connect(input.Changed, function()
 			if input.UserInputState == Enum.UserInputState.End then
 				dragging = false
 			end
@@ -41,19 +46,19 @@ Frame.InputBegan:Connect(function(input)
 	end
 end)
 
-Frame.InputChanged:Connect(function(input)
+connect(Frame.InputChanged, function(input)
 	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
 		dragInput = input
 	end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
+connect(UserInputService.InputChanged, function(input)
 	if input == dragInput and dragging then
 		update(input)
 	end
 end)
 
--- Layout for the gui
+-- Layout for GUI
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Parent = Frame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -80,7 +85,7 @@ local function makeToggle(name, default)
 	toggle.Text = name..": "..(default and "ON" or "OFF")
 	toggle.Parent = Frame
 	local state = default
-	toggle.MouseButton1Click:Connect(function()
+	connect(toggle.MouseButton1Click, function()
 		state = not state
 		toggle.Text = name..": "..(state and "ON" or "OFF")
 	end)
@@ -97,7 +102,7 @@ local function makeDropdown(name, options, default)
 	drop.Text = name..": "..options[default]
 	drop.Parent = Frame
 	local index = default
-	drop.MouseButton1Click:Connect(function()
+	connect(drop.MouseButton1Click, function()
 		index = (index % #options) + 1
 		drop.Text = name..": "..options[index]
 	end)
@@ -134,11 +139,13 @@ end
 -- Billboard Functions for name esp
 local function createBillboard(player)
 	if billboardGuis[player] then return end
+	local head = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+	if not head then return end
 	local bb = Instance.new("BillboardGui")
 	bb.Size = UDim2.new(0, 200, 0, 50)
 	bb.AlwaysOnTop = true
 	bb.Name = "FrittenkaeseESP"
-	bb.Parent = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+	bb.Parent = head
 
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Size = UDim2.new(1, 0, 0, 16)
@@ -183,54 +190,7 @@ local function removeBillboard(player)
 	end
 end
 
--- Main esp loop
-RunService.RenderStepped:Connect(function()
-	for _, v in pairs(drawings) do v:Destroy() end
-	drawings = {}
-
-	for _, player in pairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-			local hrp = player.Character.HumanoidRootPart
-			local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-
-			if espHighlightOn() then addHighlight(player) else removeHighlight(player) end
-
-			if espNameOn() or espDistanceOn() or espHealthOn() then
-				createBillboard(player)
-				local bb = billboardGuis[player]
-				if bb and player.Character then
-					bb.Enabled = true
-					local head = player.Character:FindFirstChild("Head") or hrp
-					bb.Adornee = head
-					bb.NameLabel.Text = espNameOn() and player.Name or ""
-					bb.DistLabel.Text = espDistanceOn() and (math.floor((Camera.CFrame.Position - hrp.Position).Magnitude).."m") or ""
-					bb.HPLabel.Text = espHealthOn() and ("HP: "..math.floor(player.Character.Humanoid.Health)) or ""
-				end
-			else
-				removeBillboard(player)
-			end
-
-			if espTracersOn() and onScreen then
-				local yOffset = (tracerPos() == "Bottom" and Camera.ViewportSize.Y) or
-				               (tracerPos() == "Top" and 0) or
-				               (tracerPos() == "Middle" and Camera.ViewportSize.Y / 2)
-
-				local line = Drawing.new("Line")
-				line.Color = Color3.fromRGB(255, 255, 0)
-				line.Thickness = 1
-				line.From = Vector2.new(Camera.ViewportSize.X / 2, yOffset)
-				line.To = Vector2.new(pos.X, pos.Y)
-				line.Visible = true
-				table.insert(drawings, line)
-			end
-		else
-			removeHighlight(player)
-			removeBillboard(player)
-		end
-	end
-end)
-
--- Clear ALL esp things
+-- Clear ALL ESP things
 local function clearAllESP()
 	for _, plr in pairs(Players:GetPlayers()) do
 		removeHighlight(plr)
@@ -240,7 +200,65 @@ local function clearAllESP()
 	drawings = {}
 end
 
--- Buttons on gui
+-- ESP Render Loop
+local runESP = true
+local function espLoop()
+	while runESP do
+		for _, v in pairs(drawings) do v:Destroy() end
+		drawings = {}
+
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+				local hrp = player.Character.HumanoidRootPart
+				local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+				if espHighlightOn() then addHighlight(player) else removeHighlight(player) end
+
+				if espNameOn() or espDistanceOn() or espHealthOn() then
+					createBillboard(player)
+					local bb = billboardGuis[player]
+					if bb and player.Character then
+						bb.Enabled = true
+						local head = player.Character:FindFirstChild("Head") or hrp
+						bb.Adornee = head
+						bb.NameLabel.Text = espNameOn() and player.Name or ""
+						bb.DistLabel.Text = espDistanceOn() and (math.floor((Camera.CFrame.Position - hrp.Position).Magnitude).."m") or ""
+						bb.HPLabel.Text = espHealthOn() and ("HP: "..math.floor(player.Character.Humanoid.Health)) or ""
+					end
+				else
+					removeBillboard(player)
+				end
+
+				if espTracersOn() and onScreen then
+					local yOffset = (tracerPos() == "Bottom" and Camera.ViewportSize.Y) or
+					               (tracerPos() == "Top" and 0) or
+					               (tracerPos() == "Middle" and Camera.ViewportSize.Y / 2)
+
+					local line = Drawing.new("Line")
+					line.Color = Color3.fromRGB(255, 255, 0)
+					line.Thickness = 1
+					line.From = Vector2.new(Camera.ViewportSize.X / 2, yOffset)
+					line.To = Vector2.new(pos.X, pos.Y)
+					line.Visible = true
+					table.insert(drawings, line)
+				end
+			else
+				removeHighlight(player)
+				removeBillboard(player)
+			end
+		end
+		RunService.RenderStepped:Wait()
+	end
+end
+task.spawn(espLoop)
+
+-- Player removing cleanup
+connect(Players.PlayerRemoving, function(p)
+	removeHighlight(p)
+	removeBillboard(p)
+end)
+
+-- Buttons on GUI
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(1, 0, 0, 25)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -249,9 +267,9 @@ CloseBtn.TextColor3 = Color3.new(1, 1, 1)
 CloseBtn.Font = Enum.Font.SourceSansBold
 CloseBtn.TextSize = 18
 CloseBtn.Parent = Frame
-CloseBtn.MouseButton1Click:Connect(function()
-	clearAllESP()
-	ScreenGui:Destroy()
+connect(CloseBtn.MouseButton1Click, function()
+	runESP = false
+	cleanup()
 end)
 
 local MinBtn = Instance.new("TextButton")
@@ -262,17 +280,17 @@ MinBtn.TextColor3 = Color3.new(0, 0, 0)
 MinBtn.Font = Enum.Font.SourceSansBold
 MinBtn.TextSize = 18
 MinBtn.Parent = Frame
-MinBtn.MouseButton1Click:Connect(function()
+connect(MinBtn.MouseButton1Click, function()
 	Frame.Visible = false
 	Minimized.Visible = true
 end)
 
-Minimized.MouseButton1Click:Connect(function()
+connect(Minimized.MouseButton1Click, function()
 	Frame.Visible = true
 	Minimized.Visible = false
 end)
 
--- Rainbow github link
+-- Rainbow footer
 local Footer = Instance.new("TextLabel")
 Footer.Size = UDim2.new(1, 0, 0, 35)
 Footer.BackgroundTransparency = 1
@@ -282,17 +300,29 @@ Footer.Font = Enum.Font.SourceSansBold
 Footer.TextStrokeTransparency = 0
 Footer.Parent = Frame
 
+local rainbowRunning = true
 task.spawn(function()
 	local hue = 0
-	while Footer.Parent do
+	while rainbowRunning and Footer.Parent do
 		hue = (hue + 0.01) % 1
 		Footer.TextColor3 = Color3.fromHSV(hue, 1, 1)
 		task.wait(0.03)
 	end
 end)
 
--- Player cleanup that does not work because you need to cleanup yourself
-Players.PlayerRemoving:Connect(function(p)
-	removeHighlight(p)
-	removeBillboard(p)
-end)
+-- Cleanup function
+function cleanup()
+	rainbowRunning = false
+	runESP = false
+	clearAllESP()
+	for _, conn in pairs(connections) do
+		if conn.Connected then
+			conn:Disconnect()
+		end
+	end
+	connections = {}
+	if ScreenGui then
+		ScreenGui:Destroy()
+		ScreenGui = nil
+	end
+end

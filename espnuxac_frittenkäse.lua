@@ -53,7 +53,7 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Layout
+-- Layout for the gui
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Parent = Frame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -69,7 +69,7 @@ Minimized.TextSize = 18
 Minimized.Visible = false
 Minimized.Parent = ScreenGui
 
--- Toggles & Dropdowns
+-- Toggles and Dropdowns
 local function makeToggle(name, default)
 	local toggle = Instance.new("TextButton")
 	toggle.Size = UDim2.new(1, 0, 0, 25)
@@ -113,7 +113,7 @@ local tracerPos = makeDropdown("Tracer Pos", {"Top", "Middle", "Bottom"}, 2)
 
 local highlights, billboardGuis, drawings = {}, {}, {}
 
--- Highlight Functions
+-- Highlights
 local function addHighlight(player)
 	if highlights[player] then return end
 	local highlight = Instance.new("Highlight")
@@ -131,7 +131,7 @@ local function removeHighlight(player)
 	end
 end
 
--- Billboard Functions
+-- Billboard Functions for name esp
 local function createBillboard(player)
 	if billboardGuis[player] then return end
 	local bb = Instance.new("BillboardGui")
@@ -183,7 +183,7 @@ local function removeBillboard(player)
 	end
 end
 
--- Main ESP Loop
+-- Main esp loop
 RunService.RenderStepped:Connect(function()
 	for _, v in pairs(drawings) do v:Destroy() end
 	drawings = {}
@@ -230,7 +230,7 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Clear all ESP
+-- Clear ALL esp things
 local function clearAllESP()
 	for _, plr in pairs(Players:GetPlayers()) do
 		removeHighlight(plr)
@@ -240,7 +240,7 @@ local function clearAllESP()
 	drawings = {}
 end
 
--- Buttons
+-- Buttons on gui
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(1, 0, 0, 25)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -272,7 +272,7 @@ Minimized.MouseButton1Click:Connect(function()
 	Minimized.Visible = false
 end)
 
--- Rainbow Footer
+-- Rainbow github link
 local Footer = Instance.new("TextLabel")
 Footer.Size = UDim2.new(1, 0, 0, 35)
 Footer.BackgroundTransparency = 1
@@ -291,7 +291,7 @@ task.spawn(function()
 	end
 end)
 
--- Player cleanup
+-- Player cleanup that does not work because you need to cleanup yourself
 Players.PlayerRemoving:Connect(function(p)
 	removeHighlight(p)
 	removeBillboard(p)
